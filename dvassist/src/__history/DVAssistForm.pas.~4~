@@ -1,0 +1,658 @@
+unit DVAssistForm;
+{
+--------------------------------------------------------------------------
+Copyright (c) 2000-2007, Chris Morris 
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this 
+list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice, 
+this list of conditions and the following disclaimer in the documentation and/or 
+other materials provided with the distribution.
+
+3. Neither the names Chris Morris, cLabs nor the names of contributors to this 
+software may be used to endorse or promote products derived from this software
+without specific prior written permission. 
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS'' 
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE 
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR 
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER 
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+-------------------------------------------------------------------------------- 
+(based on BSD Open Source License) 
+}
+interface
+
+uses
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
+  StdCtrls, Menus, ExtCtrls, clKeyboardPanel, ActnList, {HotKeyUnit,} clHotKey,
+  DVAssistConfigFrm, ImgList, rxStrUtils
+  {$IFDEF TESTING}, TestFramework {$ENDIF}
+  ;
+
+const
+  LANG_US_QWERTY :       string = '00000409';
+  LANG_US_DVORAK :       string = 'd0010409';
+  LANG_US_DVORAK_95 :    string = '00000409';
+  LANG_US_DVORAK_LEFT :  string = '00000409';
+  LANG_US_DVORAK_RIGHT : string = '00000409';
+
+type
+  TGUIMode = (gmOriginal, gmDvorak);
+
+  TDVAssistFrm = class(TForm)
+    Dvorak1: TMenuItem;
+    N1: TMenuItem;
+    Exit1: TMenuItem;
+    N2: TMenuItem;
+    mnuShowLayout: TMenuItem;
+    mnuHide: TMenuItem;
+    N3: TMenuItem;
+    mnuAbout: TMenuItem;
+    Timer1: TTimer;
+    mnuConfigure: TMenuItem;
+    TrayIcon: TTrayIcon;
+    IconImages: TImageList;
+    PopupMenuTray: TPopupMenu;
+    procedure FormCreate(Sender: TObject);
+    procedure Exit1Click(Sender: TObject);
+    procedure mnuShowLayoutClick(Sender: TObject);
+    procedure FormClose(Sender: TObject; var Action: TCloseAction);
+    procedure mnuHideClick(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
+    procedure mnuAboutClick(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
+    procedure actToggleToDvorakExecute;
+    procedure actToggleToOriginalExecute;
+    procedure clHotKey1Hotkey(Sender: TObject);
+    procedure mnuConfigureClick(Sender: TObject);
+    procedure TrayIconDblClick(Sender: TObject);
+    procedure Dvorak1Click(Sender: TObject);
+  private
+    FGUIMode: TGUIMode;
+    FDvorakVariant : string;
+    FShowDvorakLayout: boolean;
+    {$IFDEF DEBUG}
+    FLog: TextFile;
+    {$ENDIF}
+    FNumChecks: integer;
+    FTimeout  : integer;
+    FConfigFormOpen: boolean;
+    clHotKey1 : TclHotKey;
+    clKeyboardPanel1: TclKeyboardPanel;
+
+    procedure AppOnMessage(var Msg: TMsg; var Handled: Boolean);
+    procedure DebugOutput(AString: string);
+    procedure DisableTimeout;
+    procedure EnableTimeout;
+    function GUIModeToStr(AGUIMode: TGUIMode): string;
+    procedure LoadLayout(LangString: string);
+    procedure ReadCurrentAndSetup;
+    procedure ReadReg;
+    procedure SetHotKey(AVirtualKey: Word; AShift: TShiftState);
+    procedure SetLayout;
+    procedure ToggleLayout;
+    procedure UpdateGUI;
+    procedure WriteReg;
+    procedure ShowDvorakIsOriginalWarningAndExit;
+    procedure InitCustomComponents;
+    procedure UpdateLayoutDisplay;
+    function UpgradedFromOldDVA: boolean;
+    procedure InitDvorakVariant;
+    function IsAnyDvorakLayout(LangString: string): boolean;
+  protected
+    function ConvertHKLToRegString(): string;
+    function InputLocaleName(AHKL: HKL): string;
+
+  strict private var
+    FOriginalLayout: String;
+  end;
+
+  TShiftStateAdapter = class(TObject)
+  private
+    FShiftState: TShiftState;
+  public
+    constructor Create(i: integer); overload;
+    constructor Create(AShiftState: TShiftState); overload;
+
+    function ToInt: integer;
+    property ShiftState: TShiftState read FShiftState;
+  end;
+
+const
+  RegRoot: LongWord = HKEY_CURRENT_USER;
+  RegKey : string  = 'Software\cLabs\DVAssist';
+
+var
+  DVAssistFrm: TDVAssistFrm;
+
+implementation
+
+uses
+  Registry, cLabsAboutFrm, DVAKeyHook;
+
+{$R *.DFM}
+
+procedure TDVAssistFrm.AppOnMessage(var Msg: TMsg; var Handled: Boolean);
+begin
+  if Msg.message = WM_QUIT then
+  begin
+    DebugOutput('WM_QUIT received');
+    Close;
+  end;
+end;
+
+procedure TDVAssistFrm.actToggleToDvorakExecute;
+begin
+  if SysUtils.Win32Platform = VER_PLATFORM_WIN32_NT then
+    (* NT *)
+    LoadLayout(FDvorakVariant)
+  else
+    (* 95 *)
+    LoadLayout(LANG_US_DVORAK_95);
+
+  EnableTimeout;
+  FGUIMode := gmDvorak;
+  UpdateGUI;
+end;
+
+procedure TDVAssistFrm.actToggleToOriginalExecute;
+begin
+  LoadLayout(FOriginalLayout);
+  FGUIMode := gmOriginal;
+  UpdateGUI;
+end;
+
+procedure TDVAssistFrm.clHotKey1Hotkey(Sender: TObject);
+begin
+  ToggleLayout;
+end;
+
+function TDVAssistFrm.ConvertHKLToRegString(): string;
+var
+  Buffer: array[0..KL_NAMELENGTH-1] of char;
+begin
+  if GetKeyboardLayoutName(Buffer) then
+    SetString(Result, Buffer, StrLen(Buffer))
+  else
+    Result := '[Unknown]';
+end;
+
+procedure TDVAssistFrm.DebugOutput(AString: string);
+begin
+{$IFDEF DEBUG}
+  WriteLn(FLog, AString);
+{$ENDIF}
+end;
+
+procedure TDVAssistFrm.DisableTimeout;
+begin
+  Timer1.Enabled := false;
+end;
+
+procedure TDVAssistFrm.Dvorak1Click(Sender: TObject);
+begin
+  ToggleLayout;
+end;
+
+procedure TDVAssistFrm.EnableTimeout;
+begin
+{  Timer1.Enabled := true;
+  lpHookRec^.TheKeyCount := 0;   }
+end;
+
+procedure TDVAssistFrm.Exit1Click(Sender: TObject);
+begin
+  Application.Terminate;
+end;
+
+procedure TDVAssistFrm.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+  DebugOutput('FormClose event.');
+end;
+
+procedure TDVAssistFrm.FormCreate(Sender: TObject);
+begin
+  InitDvorakVariant;
+  InitCustomComponents;
+
+  Application.OnMessage := AppOnMessage;
+  ReadReg;
+  ReadCurrentAndSetup;
+
+  {$IFDEF DEBUG}
+  AssignFile(FLog, ExtractFilePath(Application.ExeName) + 'debglog.txt');
+  Rewrite(FLog);
+  DebugOutput('Log started');
+  {$ENDIF}
+
+  //DVAKeyHook.EnableKeyboardHook;
+end;
+
+procedure TDVAssistFrm.FormDestroy(Sender: TObject);
+begin
+  //DVAKeyHook.DisableKeyboardHook;
+  {$IFDEF DEBUG}
+  DebugOutput('Log closed.');
+  CloseFile(FLog);
+  {$ENDIF}
+  WriteReg;
+end;
+
+function TDVAssistFrm.GUIModeToStr(AGUIMode: TGUIMode): string;
+begin
+  case AGUIMode of
+  gmOriginal: Result := 'Disabled';
+  gmDvorak: Result := 'Enabled';
+  end;
+end;
+
+procedure TDVAssistFrm.InitCustomComponents;
+begin
+  { This method is needed for working with the free version of Turbo
+    Delphi which does not allow 3rd party components to be registered
+    in the IDE and worked with at Design Time. }
+
+  clHotKey1 := TclHotKey.Create(Self);
+  clHotKey1.OnHotkey := clHotKey1Hotkey;
+  clHotKey1.Active := true;
+
+  clKeyboardPanel1 := TclKeyboardPanel.Create(Self);
+  clKeyboardPanel1.Parent := Self;
+  clKeyboardPanel1.Align := alClient;
+  clKeyboardPanel1.CurrentLayoutName := klQwerty;
+end;
+
+function TDVAssistFrm.InputLocaleName(AHKL: HKL): string;
+begin
+  { Turns out this just returns the string version of the HKL (which I can
+    now use in ConvertHKLToRegString), not the localized description
+    of the layout. For that, you'll need to do some or all of what
+    System.Windows.Forms.InputLanguage.GetLocalizedKeyboardLayoutName
+    is doing in the .NET Framework - bugger }
+  raise Exception.Create('Not implemented yet.');
+end;
+
+procedure TDVAssistFrm.InitDvorakVariant;
+begin
+  FDvorakVariant := LANG_US_DVORAK;
+  if FindCmdLineSwitch('l') then
+    FDvorakVariant := LANG_US_DVORAK_LEFT
+  else if FindCmdLineSwitch('r') then
+    FDvorakVariant := LANG_US_DVORAK_RIGHT;
+end;
+
+function TDVAssistFrm.IsAnyDvorakLayout(LangString: string): boolean;
+begin
+  Result := (LangString = LANG_US_DVORAK)
+            or
+            (LangString = LANG_US_DVORAK_95)
+            or
+            (LangString = LANG_US_DVORAK_LEFT)
+            or
+            (LangString = LANG_US_DVORAK_RIGHT);
+end;
+
+procedure TDVAssistFrm.LoadLayout(LangString: string);
+var
+  OrigHKL: HKL;
+  NewHKL: HKL;
+  r: TRegistry;
+begin
+  if SysUtils.Win32Platform = VER_PLATFORM_WIN32_NT then
+  begin
+    (* NT *)
+    OrigHKL := GetKeyboardLayout(0);
+
+    { Change registry to change default - this registry activity is performed
+      by the intl.cpl Control Panel applet when switching layouts. It seems
+      to be necessary }
+    r := TRegistry.Create;
+    try
+      r.RootKey := HKEY_CURRENT_USER;
+      r.DeleteKey('Keyboard Layout');
+      r.OpenKey('Keyboard Layout\Preload', true);
+      r.WriteString('1', FOriginalLayout);
+      r.CloseKey;
+      r.OpenKey('Keyboard Layout\Substitutes', true);
+      if LangString = FDvorakVariant then
+        r.WriteString(FOriginalLayout, FDvorakVariant);
+      r.CloseKey;
+      r.OpenKey('Keyboard Layout\Toggle', true);
+      r.CloseKey;
+
+      { New docs on MSDN say the UnloadPrevious flag is unsupported }
+      NewHKL := LoadKeyboardLayout(PChar(LangString), KLF_ACTIVATE or
+        KLF_SUBSTITUTE_OK or KLF_REPLACELANG);
+
+      if NewHKL = 0 then
+        raise Exception.Create('LoadKeyboardLayout failed.');
+
+      r.OpenKey('Keyboard Layout\Toggle', true);
+      r.WriteString('HotKey', '1');
+      r.CloseKey;
+    finally
+      r.Free;
+    end;
+
+    (* required to get the point across to all open processes *)
+    PostMessage(HWND_BROADCAST, WM_INPUTLANGCHANGEREQUEST, 0, NewHKL);
+
+    (* required to change the default layout. If the default is not
+       changed from the old layout to the new layout, the old layout
+       cannot be unloaded in the next step *)
+    if not SystemParametersInfo(SPI_SETDEFAULTINPUTLANG, 0, Addr(NewHKL),
+      SPIF_SENDCHANGE) then
+      RaiseLastOSError;
+
+    if NewHKL <> OrigHKL then
+      if not UnloadKeyboardLayout(OrigHKL) then
+        raise Exception.Create('Unable to unload keyboard layout.');
+  end
+  else begin
+    (* 95 *)
+    NewHKL := LoadKeyboardLayout(PChar(LangString), KLF_ACTIVATE or KLF_REORDER
+      or KLF_REPLACELANG or KLF_SUBSTITUTE_OK);
+
+    if NewHKL = 0 then
+      raise Exception.Create('LoadKeyboardLayout failed.');
+  end;
+end;
+
+procedure TDVAssistFrm.mnuAboutClick(Sender: TObject);
+begin
+  clAboutForm := TclAboutForm.Create(Application);
+  try
+    clAboutForm.AppName := 'Dvorak Assistant';
+    clAboutForm.AppURL := 'http://clabs.org/dvorak.htm';
+    //clAboutForm.Date := '7/9/2001';
+    clAboutForm.clCreditPanel.Credits.Clear;
+    clAboutForm.clCreditPanel.Credits.Add('Credits');
+    clAboutForm.clCreditPanel.Credits.Add('');
+    clAboutForm.clCreditPanel.Credits.Add('programming');
+    clAboutForm.clCreditPanel.Credits.Add('Chris Morris');
+    clAboutForm.clCreditPanel.Credits.Add('');
+    clAboutForm.clCreditPanel.Credits.Add('nt support assistance');
+    clAboutForm.clCreditPanel.Credits.Add('Mark Randall');
+    clAboutForm.clCreditPanel.ResetCredits;
+    clAboutForm.ShowForm;
+  finally
+    clAboutForm.Free;
+    clAboutForm := nil;
+  end;
+end;
+
+procedure TDVAssistFrm.mnuConfigureClick(Sender: TObject);
+begin
+  if not FConfigFormOpen then
+  begin
+    FConfigFormOpen := true;
+    DVAssistConfigForm := TDVAssistConfigForm.Create(nil);
+    try
+      DVAssistConfigForm.clHotKeyEdit.VirtualKey := clHotKey1.VirtualKey;
+      DVAssistConfigForm.clHotKeyEdit.Shift := clHotKey1.Shift;
+      if DVAssistConfigForm.ShowModal = mrOK then
+      begin
+        SetHotKey(DVAssistConfigForm.clHotKeyEdit.VirtualKey,
+          DVAssistConfigForm.clHotKeyEdit.Shift);
+      end;
+    finally
+      DVAssistConfigForm.Free;
+      FConfigFormOpen := false;
+    end;
+  end;
+end;
+
+procedure TDVAssistFrm.mnuHideClick(Sender: TObject);
+begin
+  Hide;
+  mnuShowLayoutClick(Self);
+end;
+
+procedure TDVAssistFrm.mnuShowLayoutClick(Sender: TObject);
+begin
+  FShowDvorakLayout := not FShowDvorakLayout;
+  UpdateGUI;
+end;
+
+procedure TDVAssistFrm.ReadCurrentAndSetup;
+var
+  CurrentLayout: string;
+begin
+  CurrentLayout := ConvertHKLToRegString();
+  if (IsAnyDvorakLayout(CurrentLayout)) then
+  begin
+    if (FOriginalLayout = '') then
+    begin
+      if (UpgradedFromOldDVA) then
+      begin
+        FOriginalLayout := LANG_US_QWERTY;
+        FGUIMode := gmDvorak;
+      end else begin
+        ShowDvorakIsOriginalWarningAndExit;
+      end;
+    end else begin
+      FGUIMode := gmDvorak;
+    end;
+  end
+  else begin
+    FOriginalLayout := CurrentLayout;
+    FGUIMode := gmOriginal
+  end;
+
+  SetLayout;
+  UpdateGUI;
+end;
+
+procedure TDVAssistFrm.ReadReg;
+var
+  r: TRegistry;
+begin
+  r := TRegistry.Create;
+  try
+    r.RootKey := RegRoot;
+    if r.OpenKey(RegKey, false) then
+    begin
+      FOriginalLayout := r.ReadString('OrigLayout');
+      Left := r.ReadInteger('Left');
+      Top := r.ReadInteger('Top');
+      Height := r.ReadInteger('Height');
+      Width := r.ReadInteger('Width');
+      if r.ValueExists('Enabled') and r.ReadBool('Enabled') then
+        FGUIMode := gmDvorak
+      else
+        FGUIMode := gmOriginal;
+      SetHotKey(r.ReadInteger('ShortcutKey'), TShiftStateAdapter.Create(r.ReadInteger('ShortcutShift')).ShiftState);
+
+      if r.ReadBool('ShowLayout') then
+        mnuShowLayoutClick(Self);
+    end else begin
+      // set the default hot key of Ctrl+Shift+F12
+      SetHotKey($7B, TShiftStateAdapter.Create(3).ShiftState);
+    end;
+  finally
+    r.Free;
+  end;
+end;
+
+procedure TDVAssistFrm.SetHotKey(AVirtualKey: Word; AShift: TShiftState);
+begin
+  try
+    clHotKey1.Active     := false;
+    clHotKey1.VirtualKey := AVirtualKey;
+    clHotKey1.Shift      := AShift;
+    clHotKey1.Active     := true;
+  except
+    on E: EclHotKeyException do
+    begin
+      MessageDlg('DVAssist was unable to register the configured hotkey. ' +
+        'Most likely this is because another program has it registered ' +
+        'already.', mtError, [mbOK], 0);
+    end;
+  end;
+end;
+
+(* This proc checks the key count every 30 seconds. *)
+procedure TDVAssistFrm.Timer1Timer(Sender: TObject);
+begin
+  if lpHookRec^.TheKeyCount = 0 then
+  begin
+    (* if it's still at zero, no keys have been typed, check for timeout. *)
+    Inc(FNumChecks);
+    if FNumChecks >= FTimeout then
+    begin
+      actToggleToOriginalExecute;
+      DisableTimeout;
+    end;
+  end
+  else begin
+    (* Keys have been typed, start the process over again *)
+    FNumChecks := 0;
+    lpHookRec^.TheKeyCount := 0;
+  end;
+end;
+
+procedure TDVAssistFrm.ToggleLayout;
+begin
+  DebugOutput('ToggleLayout');
+  if FGUIMode = gmOriginal then
+    FGUIMode := gmDvorak
+  else
+    FGUIMode := gmOriginal;
+  SetLayout;
+end;
+
+procedure TDVAssistFrm.TrayIconDblClick(Sender: TObject);
+begin
+  ToggleLayout;
+end;
+
+procedure TDVAssistFrm.SetLayout;
+begin
+  if FGUIMode = gmOriginal then
+    actToggleToOriginalExecute
+  else
+    actToggleToDvorakExecute;
+end;
+
+procedure TDVAssistFrm.ShowDvorakIsOriginalWarningAndExit;
+begin
+  ShowMessage('Dvorak appears to be the current keyboard layout. ' +
+    'Dvorak Assistant is designed to toggle between Dvorak and ' +
+    'your usual keyboard layout and must record the non-Dvorak ' +
+    'layout when it is loaded. Please load your regular layout ' +
+    'and re-run Dvorak Assistant.');
+  Application.Terminate;
+end;
+
+procedure TDVAssistFrm.UpdateGUI;
+begin
+  Dvorak1.Checked := (FGUIMode = gmDvorak);
+  TrayIcon.IconIndex := integer(FGUIMode);
+  TrayIcon.Hint := GUIModeToStr(FGUIMode);
+  UpdateLayoutDisplay;
+
+  clKeyboardPanel1.CurrentLayoutName := TclKeyboardLayoutName(FGUIMode);
+end;
+
+procedure TDVAssistFrm.UpdateLayoutDisplay;
+begin
+  mnuShowLayout.Enabled := (FGUIMode = gmDvorak);
+  if (FGUIMode = gmDvorak) and FShowDvorakLayout then
+  begin
+    Show;
+    mnuShowLayout.Caption := '&Hide Layout';
+  end
+  else begin
+    Hide;
+    mnuShowLayout.Caption := '&Show Layout';
+  end;
+end;
+
+procedure TDVAssistFrm.WriteReg;
+var
+  r: TRegistry;
+begin
+  r := TRegistry.Create;
+  try
+    r.RootKey := RegRoot;
+    r.OpenKey(RegKey, true);
+    r.WriteInteger('Left', Left);
+    r.WriteInteger('Top', Top);
+    r.WriteInteger('Height', Height);
+    r.WriteInteger('Width', Width);
+    r.WriteBool('Enabled', Dvorak1.Checked);
+    r.WriteString('OrigLayout', FOriginalLayout);
+    r.WriteInteger('ShortcutKey', clHotKey1.VirtualKey);
+    r.WriteInteger('ShortcutShift', TShiftStateAdapter.Create(clHotKey1.Shift).ToInt);
+
+    r.WriteBool('ShowLayout', (mnuShowLayout.Caption <> '&Show Layout'));
+  finally
+    r.Free;
+  end;
+end;
+
+function TDVAssistFrm.UpgradedFromOldDVA: boolean;
+var
+  r: TRegistry;
+begin
+  Result := false;
+  r := TRegistry.Create;
+  try
+    r.RootKey := RegRoot;
+    if r.OpenKey(RegKey, false) then
+    begin
+      Result := r.ValueExists('Layout');
+    end;
+  finally
+    r.Free;
+  end;
+end;
+
+{ TShiftStateAdapter }
+
+constructor TShiftStateAdapter.Create(i: integer);
+begin
+  FShiftState := [];
+
+  if (i and 1 <> 0) then
+    Include(FShiftState, ssShift);
+
+  if (i and 2 <> 0) then
+    Include(FShiftState, ssCtrl);
+
+  if (i and 4 <> 0) then
+    Include(FShiftState, ssAlt);
+
+end;
+
+constructor TShiftStateAdapter.Create(AShiftState: TShiftState);
+begin
+  FShiftState := AShiftState;
+end;
+
+function TShiftStateAdapter.ToInt: integer;
+begin
+  Result := 0;
+
+  if ssShift in FShiftState then
+    Result := Result + 1;
+
+  if ssCtrl in FShiftState then
+    Result := Result + 2;
+
+  if ssAlt in FShiftState then
+    Result := Result + 4;
+end;
+
+end.

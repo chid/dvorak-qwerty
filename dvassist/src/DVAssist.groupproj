@@ -1,0 +1,36 @@
+﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{5EE8071B-CA20-482C-841B-C8A2B634CB35}</ProjectGuid>
+		</PropertyGroup>
+		<ItemGroup>
+			<Projects Include="DVAssist.dproj">
+				<Dependencies/>
+			</Projects>
+		</ItemGroup>
+		<ProjectExtensions>
+			<Borland.Personality>Default.Personality.12</Borland.Personality>
+			<Borland.ProjectType/>
+			<BorlandProject>
+				<Default.Personality/>
+			</BorlandProject>
+		</ProjectExtensions>
+		<Target Name="DVAssist">
+			<MSBuild Projects="DVAssist.dproj"/>
+		</Target>
+		<Target Name="DVAssist:Clean">
+			<MSBuild Targets="Clean" Projects="DVAssist.dproj"/>
+		</Target>
+		<Target Name="DVAssist:Make">
+			<MSBuild Targets="Make" Projects="DVAssist.dproj"/>
+		</Target>
+		<Target Name="Build">
+			<CallTarget Targets="DVAssist"/>
+		</Target>
+		<Target Name="Clean">
+			<CallTarget Targets="DVAssist:Clean"/>
+		</Target>
+		<Target Name="Make">
+			<CallTarget Targets="DVAssist:Make"/>
+		</Target>
+		<Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+	</Project>

@@ -1,0 +1,129 @@
+﻿	<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+		<PropertyGroup>
+			<ProjectGuid>{FDA58BB2-9708-482B-845F-E542130E5EAE}</ProjectGuid>
+			<MainSource>DVAssist.dpr</MainSource>
+			<Config Condition="'$(Config)'==''">Release</Config>
+			<DCC_DCCCompiler>DCC32</DCC_DCCCompiler>
+			<ProjectVersion>12.0</ProjectVersion>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Config)'=='Release' or '$(Cfg_1)'!=''">
+			<Cfg_1>true</Cfg_1>
+			<CfgParent>Base</CfgParent>
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_2)'!=''">
+			<Cfg_2>true</Cfg_2>
+			<CfgParent>Base</CfgParent>
+			<Base>true</Base>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Base)'!=''">
+			<DCC_DependencyCheckOutputName>..\bin\DVAssist.exe</DCC_DependencyCheckOutputName>
+			<DCC_UnitSearchPath>..\lib\clutil;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+			<DCC_UsePackage>VCLX30;VCL30;VCLDB30;VCLDBX30;INETDB30;INET30;VCLSMP30;QRPT30;TEEUI30;TEEDB30;TEE30;DSS30;IBEVNT30;RXCTL;RXDB;RXTOOLS</DCC_UsePackage>
+			<DCC_ImageBase>00400000</DCC_ImageBase>
+			<DCC_UnitAlias>WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE;$(DCC_UnitAlias)</DCC_UnitAlias>
+			<DCC_Alignment>1</DCC_Alignment>
+			<DCC_ExeOutput>..\bin</DCC_ExeOutput>
+			<DCC_Platform>x86</DCC_Platform>
+			<DCC_K>false</DCC_K>
+			<DCC_F>false</DCC_F>
+			<DCC_S>false</DCC_S>
+			<DCC_N>true</DCC_N>
+			<DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
+			<DCC_WriteableConstants>true</DCC_WriteableConstants>
+			<DCC_E>false</DCC_E>
+			<DCC_DcuOutput>..\dcu</DCC_DcuOutput>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Cfg_1)'!=''">
+			<DCC_Define>RELEASE;$(DCC_Define)</DCC_Define>
+			<DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
+			<DCC_DebugInformation>false</DCC_DebugInformation>
+		</PropertyGroup>
+		<PropertyGroup Condition="'$(Cfg_2)'!=''">
+			<DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
+		</PropertyGroup>
+		<ItemGroup>
+			<DelphiCompile Include="DVAssist.dpr">
+				<MainSource>MainSource</MainSource>
+			</DelphiCompile>
+			<DCCReference Include="DVAssistForm.pas">
+				<Form>DVAssistFrm</Form>
+			</DCCReference>
+			<DCCReference Include="DVAKeyHook.pas"/>
+			<None Include="ModelSupport_DVAssist\default.txaPackage"/>
+			<None Include="ModelSupport_DVAssist\DVAssist\default.txaPackage"/>
+			<None Include="ModelSupport_DVAssist\DVAssistForm\default.txaPackage"/>
+			<None Include="ModelSupport_DVAssist\DVAKeyHook\default.txaPackage"/>
+			<None Include="ModelSupport_DVAssist\default.txvpck"/>
+			<None Include="ModelSupport_DVAssist\DVAssistForm\default.txvpck"/>
+			<None Include="ModelSupport_DVAssist\DVAssist\default.txvpck"/>
+			<BuildConfiguration Include="Base">
+				<Key>Base</Key>
+			</BuildConfiguration>
+			<BuildConfiguration Include="Debug">
+				<Key>Cfg_2</Key>
+				<CfgParent>Base</CfgParent>
+			</BuildConfiguration>
+			<BuildConfiguration Include="Release">
+				<Key>Cfg_1</Key>
+				<CfgParent>Base</CfgParent>
+			</BuildConfiguration>
+		</ItemGroup>
+		<Import Project="$(BDS)\Bin\CodeGear.Delphi.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')"/>
+		<ProjectExtensions>
+			<Borland.Personality>Delphi.Personality.12</Borland.Personality>
+			<Borland.ProjectType>VCLApplication</Borland.ProjectType>
+			<BorlandProject>
+				<Delphi.Personality>
+					<Source>
+						<Source Name="MainSource">DVAssist.dpr</Source>
+					</Source>
+					<Parameters>
+						<Parameters Name="RunParams">-l</Parameters>
+						<Parameters Name="UseLauncher">False</Parameters>
+						<Parameters Name="LoadAllSymbols">True</Parameters>
+						<Parameters Name="LoadUnspecifiedSymbols">False</Parameters>
+					</Parameters>
+					<VersionInfo>
+						<VersionInfo Name="IncludeVerInfo">True</VersionInfo>
+						<VersionInfo Name="AutoIncBuild">True</VersionInfo>
+						<VersionInfo Name="MajorVer">2</VersionInfo>
+						<VersionInfo Name="MinorVer">0</VersionInfo>
+						<VersionInfo Name="Release">1</VersionInfo>
+						<VersionInfo Name="Build">69</VersionInfo>
+						<VersionInfo Name="Debug">False</VersionInfo>
+						<VersionInfo Name="PreRelease">False</VersionInfo>
+						<VersionInfo Name="Special">False</VersionInfo>
+						<VersionInfo Name="Private">False</VersionInfo>
+						<VersionInfo Name="DLL">False</VersionInfo>
+						<VersionInfo Name="Locale">1033</VersionInfo>
+						<VersionInfo Name="CodePage">1252</VersionInfo>
+					</VersionInfo>
+					<VersionInfoKeys>
+						<VersionInfoKeys Name="CompanyName">cLabs.org</VersionInfoKeys>
+						<VersionInfoKeys Name="FileDescription">Dvorak Assistant</VersionInfoKeys>
+						<VersionInfoKeys Name="FileVersion">2.0.1.69</VersionInfoKeys>
+						<VersionInfoKeys Name="InternalName"/>
+						<VersionInfoKeys Name="LegalCopyright">Copyright</VersionInfoKeys>
+						<VersionInfoKeys Name="LegalTrademarks"/>
+						<VersionInfoKeys Name="OriginalFilename">DVAssist.exe</VersionInfoKeys>
+						<VersionInfoKeys Name="ProductName">Dvorak Assistant</VersionInfoKeys>
+						<VersionInfoKeys Name="ProductVersion">2.0</VersionInfoKeys>
+						<VersionInfoKeys Name="Comments"/>
+					</VersionInfoKeys>
+					<Excluded_Packages>
+						<Excluded_Packages Name="c:\program files\borland\bds\4.0\Bin\dclib100.bpl">Borland InterBase Express Components</Excluded_Packages>
+						<Excluded_Packages Name="c:\program files\borland\bds\4.0\Bin\dclIntraweb_80_100.bpl">Intraweb 8.0 Design Package for Borland Development Studio 2006</Excluded_Packages>
+						<Excluded_Packages Name="c:\program files\borland\bds\4.0\Bin\dclIndyCore100.bpl">Indy 10 Core Design Time</Excluded_Packages>
+						<Excluded_Packages Name="c:\program files\borland\bds\4.0\Bin\dclsmp100.bpl">Borland Sample Components</Excluded_Packages>
+						<Excluded_Packages Name="c:\program files\borland\bds\4.0\Bin\dclIndyProtocols100.bpl">Indy 10 Protocols Design Time</Excluded_Packages>
+						<Excluded_Packages Name="c:\program files\borland\bds\4.0\Bin\dcltee100.bpl">TeeChart Components</Excluded_Packages>
+					</Excluded_Packages>
+				</Delphi.Personality>
+			</BorlandProject>
+			<ProjectFileVersion>12</ProjectFileVersion>
+		</ProjectExtensions>
+	</Project>

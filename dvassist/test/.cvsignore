@@ -1,0 +1,8 @@
+__history
+*.~??
+*.dsk
+*.drc
+TestDVAssist.res
+TestDVAssist.bdsproj.local
+TestDVAssist.identcache
+ModelSupport_TestDVAssist

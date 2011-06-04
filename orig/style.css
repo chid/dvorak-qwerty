@@ -1,0 +1,87 @@
+body
+{
+	text-align:	center;
+}
+
+#container
+{
+	border-left:	1px dashed #E0E0E0;
+	margin-left:	auto;
+	margin-right:	auto;
+	font-family:	verdana;
+	font-size:	10pt;
+	text-align:	justify;
+	width:		780px;
+	padding-left:	20px;
+}
+
+h1, h2, h3
+{
+	font-family:	times;
+}
+
+ul
+{
+	padding-left:	0px;
+	margin-left:	0px;
+	list-style-type:	square;
+}
+
+ul li
+{
+	margin-left:	20px;
+}
+
+ul.spaced li
+{
+	padding-bottom:	10px;
+}
+ul.spaced h3
+{
+	margin: 0px; 
+}
+
+#screenshots
+{
+	float:		right;
+	margin-left:	10px;
+	padding:	10px;
+	background-color:	#E0E0E0
+}
+
+#screenshots img
+{
+	width:		164px;
+	border:		1px blue solid;
+}
+
+#screenshots div
+{
+	font-size:	8pt;
+	margin-top:	0px;
+	margin-bottom:	10px;
+}
+
+#pictures 
+{
+	text-align:	center;
+}
+
+#pictures div
+{
+	margin:		10px;
+	padding:	10px;
+	background-color:	#E0E0E0
+}
+
+#pictures div div
+{
+	font-size:	10pt;
+	margin-top:	0px;
+	margin-bottom:	20px;
+}
+
+#quote
+{
+	font-style:	italic;
+}

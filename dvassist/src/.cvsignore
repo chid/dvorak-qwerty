@@ -1,0 +1,10 @@
+__history
+*.~*
+*.dsk
+*.drc
+DVAssist.bdsproj.local
+DVAssist.bdsgroup.local
+DVAssist.identcache
+ModelSupport_DVAssist
+LibrarySupport
+DVAssist.config

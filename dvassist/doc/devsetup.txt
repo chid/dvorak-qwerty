@@ -1,0 +1,9 @@
+Delphi IDE setup to compile DVAssist.dpr
+========================================
+
+DVAssist can be built (and is currently maintained) with a copy of Turbo Delphi
+for Windows, available for free from codegear.com. Unfortunately, the free Turbo
+version does not allow 3rd party controls to be registered in the IDE, so the
+few custom components used by DVAssist are no longer usable at design-time, but
+are now created at run-time. Code should compile 'out of the box' with no
+further setup.

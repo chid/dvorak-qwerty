@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+  <PersonalityInfo>
+    <Option>
+      <Option Name="Personality">Default.Personality</Option>
+      <Option Name="ProjectType"></Option>
+      <Option Name="Version">1.0</Option>
+      <Option Name="GUID">{8345348D-E0D1-4832-A626-35142B82B02F}</Option>
+    </Option>
+  </PersonalityInfo>
+  <Default.Personality>
+    
+    <Projects>
+      <Projects Name="DVAssist.exe">DVAssist.bdsproj</Projects>
+      <Projects Name="TestDVAssist.exe">..\test\TestDVAssist.bdsproj</Projects>
+      <Projects Name="Targets">DVAssist.exe TestDVAssist.exe</Projects>
+    </Projects>
+    <Dependencies/>
+  </Default.Personality>
+</BorlandProject>
