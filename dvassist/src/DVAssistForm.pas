@@ -274,13 +274,41 @@ begin
 end;
 
 function TDVAssistFrm.InputLocaleName(AHKL: HKL): string;
+var
+  KLID: string;
+  HighPart: Word;
+  r: TRegistry;
 begin
-  { Turns out this just returns the string version of the HKL (which I can
-    now use in ConvertHKLToRegString), not the localized description
-    of the layout. For that, you'll need to do some or all of what
-    System.Windows.Forms.InputLanguage.GetLocalizedKeyboardLayoutName
-    is doing in the .NET Framework - bugger }
-  raise Exception.Create('Not implemented yet.');
+  { Look up the localized layout description in the registry, the same place
+    System.Windows.Forms.InputLanguage.GetLocalizedKeyboardLayoutName reads
+    from. The KLID (Keyboard Layout Identifier) is derived from the HKL:
+    for standard layouts the high word is zero (or mirrors the low word)
+    and the KLID is just the language identifier formatted as eight hex
+    digits; alternate layouts encode an additional layout ID in the high
+    word. The 'Layout Text' value under HKLM\SYSTEM\CurrentControlSet\
+    Control\Keyboard Layouts\<KLID> holds the localized name. }
+
+  HighPart := HiWord(AHKL);
+  if (HighPart = 0) or (HighPart = LoWord(AHKL)) then
+    KLID := Format('%.8x', [LoWord(AHKL)])
+  else
+    KLID := Format('%.4x%.4x', [HighPart, LoWord(AHKL)]);
+
+  Result := '[Unknown]';
+  r := TRegistry.Create;
+  try
+    r.RootKey := HKEY_LOCAL_MACHINE;
+    if r.OpenKeyReadOnly(
+        'SYSTEM\CurrentControlSet\Control\Keyboard Layouts\' + KLID) then
+    try
+      if r.ValueExists('Layout Text') then
+        Result := r.ReadString('Layout Text');
+    finally
+      r.CloseKey;
+    end;
+  finally
+    r.Free;
+  end;
 end;
 
 procedure TDVAssistFrm.InitDvorakVariant;
